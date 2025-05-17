@@ -1,11 +1,10 @@
 const fs = require('fs');
 const { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes } = require('discord.js');
-const schedule = require('node-schedule');
 
-const TOKEN = '';
-const CLIENT_ID = '';
-const GUILD_ID = '';
-const ADMIN_ROLE_ID = '';
+const TOKEN = process.env.TOKEN;
+const CLIENT_ID = process.env.CLIENT_ID;
+const GUILD_ID = process.env.GUILD_ID;
+const ADMIN_ROLE_ID = process.env.ADMIN_ROLE_ID;
 
 const commissionFile = 'commission.json';
 const volumeFile = 'volume.json';
@@ -34,6 +33,7 @@ const commands = [
     .addUserOption(opt => opt.setName('user').setDescription('User to check').setRequired(true))
     .addIntegerOption(opt => opt.setName('rate').setDescription('Rate percentage (10 or 15)').setRequired(true)
       .addChoices({ name: '10%', value: 10 }, { name: '15%', value: 15 })),
+  new SlashCommandBuilder().setName('reset').setDescription('Reset your profit to 0'),
 ];
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
@@ -52,13 +52,6 @@ client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
-// Daily reset
-schedule.scheduleJob({ hour: 0, minute: 0, tz: 'America/New_York' }, () => {
-  console.log('Resetting daily profits...');
-  fs.writeFileSync(commissionFile, JSON.stringify({ total: 0 }));
-  fs.writeFileSync(dailyUserFile, JSON.stringify({ users: {} }));
-});
-
 client.on('interactionCreate', async interaction => {
   if (!interaction.isCommand()) return;
 
@@ -75,32 +68,28 @@ client.on('interactionCreate', async interaction => {
     const amount = interaction.options.getNumber('amount');
     const delta = commandName === 'ap' ? amount : -amount;
 
-    // Update global daily commission
     const commissionData = JSON.parse(fs.readFileSync(commissionFile));
     commissionData.total = Math.max(0, commissionData.total + delta);
     fs.writeFileSync(commissionFile, JSON.stringify(commissionData));
 
-    // Update global volume & user volume
     const volumeData = JSON.parse(fs.readFileSync(volumeFile));
     if (!volumeData.users[user.id]) volumeData.users[user.id] = 0;
     volumeData.users[user.id] = Math.max(0, volumeData.users[user.id] + delta);
     volumeData.total = Math.max(0, volumeData.total + delta);
     fs.writeFileSync(volumeFile, JSON.stringify(volumeData));
 
-    // Update daily user profit
     const dailyUserData = JSON.parse(fs.readFileSync(dailyUserFile));
     if (!dailyUserData.users[user.id]) dailyUserData.users[user.id] = 0;
     dailyUserData.users[user.id] = Math.max(0, dailyUserData.users[user.id] + delta);
     fs.writeFileSync(dailyUserFile, JSON.stringify(dailyUserData));
 
-    // Update history
     if (!historyData[today]) historyData[today] = { total: 0, users: {} };
     if (!historyData[today].users[user.id]) historyData[today].users[user.id] = 0;
     historyData[today].users[user.id] = Math.max(0, historyData[today].users[user.id] + delta);
     historyData[today].total = Math.max(0, historyData[today].total + delta);
     fs.writeFileSync(historyFile, JSON.stringify(historyData));
 
-    await interaction.reply(`${commandName === 'ap' ? 'Added' : 'Removed'} $${Math.abs(amount).toFixed(2)} ${commandName === 'ap' ? 'to' : 'from'} your profit.`);
+    await interaction.reply({ content: `${commandName === 'ap' ? 'Added' : 'Removed'} $${Math.abs(amount).toFixed(2)} ${commandName === 'ap' ? 'to' : 'from'} your profit.`, ephemeral: true });
   }
 
   if (commandName === 'vol') {
@@ -111,22 +100,22 @@ client.on('interactionCreate', async interaction => {
     if (dateOption) {
       const dateEntry = historyData[dateOption];
       if (!dateEntry) {
-        await interaction.reply(`No data for ${dateOption}.`);
+        await interaction.reply({ content: `No data for ${dateOption}.`, ephemeral: true });
         return;
       }
 
       if (targetUser) {
         const userTotal = dateEntry.users[targetUser.id] || 0;
-        await interaction.reply(`${targetUser.username} earned $${userTotal.toFixed(2)} on ${dateOption}.`);
+        await interaction.reply({ content: `${targetUser.username} earned $${userTotal.toFixed(2)} on ${dateOption}.`, ephemeral: true });
       } else {
-        await interaction.reply(`Server earned $${dateEntry.total.toFixed(2)} on ${dateOption}.`);
+        await interaction.reply({ content: `Server earned $${dateEntry.total.toFixed(2)} on ${dateOption}.`, ephemeral: true });
       }
     } else {
       if (targetUser) {
         const userTotal = volumeData.users[targetUser.id] || 0;
-        await interaction.reply(`${targetUser.username} has earned $${userTotal.toFixed(2)} total.`);
+        await interaction.reply({ content: `${targetUser.username} has earned $${userTotal.toFixed(2)} total.`, ephemeral: true });
       } else {
-        await interaction.reply(`Server total volume: $${volumeData.total.toFixed(2)}`);
+        await interaction.reply({ content: `Server total volume: $${volumeData.total.toFixed(2)}`, ephemeral: true });
       }
     }
   }
@@ -138,9 +127,9 @@ client.on('interactionCreate', async interaction => {
 
     if (targetUser) {
       const userDaily = dailyUserData.users[targetUser.id] || 0;
-      await interaction.reply(`${targetUser.username} made $${userDaily.toFixed(2)} today.`);
+      await interaction.reply({ content: `${targetUser.username} made $${userDaily.toFixed(2)} today.`, ephemeral: true });
     } else {
-      await interaction.reply(`Server made $${commissionData.total.toFixed(2)} today.`);
+      await interaction.reply({ content: `Server made $${commissionData.total.toFixed(2)} today.`, ephemeral: true });
     }
   }
 
@@ -152,7 +141,22 @@ client.on('interactionCreate', async interaction => {
     const userDaily = dailyUserData.users[targetUser.id] || 0;
     const payAmount = userDaily * (rate / 100);
 
-    await interaction.reply(`${targetUser.username} owes Cody $${payAmount.toFixed(2)} (${rate}% of $${userDaily.toFixed(2)} today).`);
+    await interaction.reply({ content: `${targetUser.username} owes Cody $${payAmount.toFixed(2)} (${rate}% of $${userDaily.toFixed(2)} today).`, ephemeral: true });
+  }
+
+  if (commandName === 'reset') {
+    const volumeData = JSON.parse(fs.readFileSync(volumeFile));
+    const dailyUserData = JSON.parse(fs.readFileSync(dailyUserFile));
+
+    const userTotalBefore = volumeData.users[user.id] || 0;
+    volumeData.total = Math.max(0, volumeData.total - userTotalBefore);
+    volumeData.users[user.id] = 0;
+    fs.writeFileSync(volumeFile, JSON.stringify(volumeData));
+
+    dailyUserData.users[user.id] = 0;
+    fs.writeFileSync(dailyUserFile, JSON.stringify(dailyUserData));
+
+    await interaction.reply({ content: `Your profit has been reset to $0.`, ephemeral: true });
   }
 });
 
