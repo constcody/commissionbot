@@ -21,9 +21,11 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 const commands = [
   new SlashCommandBuilder().setName('ap').setDescription('Add profit')
-    .addNumberOption(opt => opt.setName('amount').setDescription('Amount to add').setRequired(true)),
+    .addNumberOption(opt => opt.setName('amount').setDescription('Amount to add').setRequired(true))
+    .addUserOption(opt => opt.setName('user').setDescription('User to apply to (optional)')),
   new SlashCommandBuilder().setName('rp').setDescription('Remove profit')
-    .addNumberOption(opt => opt.setName('amount').setDescription('Amount to remove').setRequired(true)),
+    .addNumberOption(opt => opt.setName('amount').setDescription('Amount to remove').setRequired(true))
+    .addUserOption(opt => opt.setName('user').setDescription('User to apply to (optional)')),
   new SlashCommandBuilder().setName('vol').setDescription('Show volume earned')
     .addUserOption(opt => opt.setName('user').setDescription('User to check (optional)'))
     .addStringOption(opt => opt.setName('date').setDescription('Date (YYYY-MM-DD) to check (optional)')),
@@ -66,6 +68,7 @@ client.on('interactionCreate', async interaction => {
 
   if (commandName === 'ap' || commandName === 'rp') {
     const amount = interaction.options.getNumber('amount');
+    const targetUser = interaction.options.getUser('user') || user;
     const delta = commandName === 'ap' ? amount : -amount;
 
     const commissionData = JSON.parse(fs.readFileSync(commissionFile));
@@ -73,23 +76,23 @@ client.on('interactionCreate', async interaction => {
     fs.writeFileSync(commissionFile, JSON.stringify(commissionData));
 
     const volumeData = JSON.parse(fs.readFileSync(volumeFile));
-    if (!volumeData.users[user.id]) volumeData.users[user.id] = 0;
-    volumeData.users[user.id] = Math.max(0, volumeData.users[user.id] + delta);
+    if (!volumeData.users[targetUser.id]) volumeData.users[targetUser.id] = 0;
+    volumeData.users[targetUser.id] = Math.max(0, volumeData.users[targetUser.id] + delta);
     volumeData.total = Math.max(0, volumeData.total + delta);
     fs.writeFileSync(volumeFile, JSON.stringify(volumeData));
 
     const dailyUserData = JSON.parse(fs.readFileSync(dailyUserFile));
-    if (!dailyUserData.users[user.id]) dailyUserData.users[user.id] = 0;
-    dailyUserData.users[user.id] = Math.max(0, dailyUserData.users[user.id] + delta);
+    if (!dailyUserData.users[targetUser.id]) dailyUserData.users[targetUser.id] = 0;
+    dailyUserData.users[targetUser.id] = Math.max(0, dailyUserData.users[targetUser.id] + delta);
     fs.writeFileSync(dailyUserFile, JSON.stringify(dailyUserData));
 
     if (!historyData[today]) historyData[today] = { total: 0, users: {} };
-    if (!historyData[today].users[user.id]) historyData[today].users[user.id] = 0;
-    historyData[today].users[user.id] = Math.max(0, historyData[today].users[user.id] + delta);
+    if (!historyData[today].users[targetUser.id]) historyData[today].users[targetUser.id] = 0;
+    historyData[today].users[targetUser.id] = Math.max(0, historyData[today].users[targetUser.id] + delta);
     historyData[today].total = Math.max(0, historyData[today].total + delta);
     fs.writeFileSync(historyFile, JSON.stringify(historyData));
 
-    await interaction.reply({ content: `${commandName === 'ap' ? 'Added' : 'Removed'} $${Math.abs(amount).toFixed(2)} ${commandName === 'ap' ? 'to' : 'from'} your profit.`, ephemeral: true });
+    await interaction.reply({ content: `${commandName === 'ap' ? 'Added' : 'Removed'} $${Math.abs(amount).toFixed(2)} ${commandName === 'ap' ? 'to' : 'from'} ${targetUser.username}'s profit.`, ephemeral: true });
   }
 
   if (commandName === 'vol') {
