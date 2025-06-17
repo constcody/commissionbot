@@ -22,10 +22,10 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const commands = [
   new SlashCommandBuilder().setName('ap').setDescription('Add profit')
     .addNumberOption(opt => opt.setName('amount').setDescription('Amount to add').setRequired(true))
-    .addUserOption(opt => opt.setName('user').setDescription('User to apply to (optional)')),
+    .addUserOption(opt => opt.setName('user').setDescription('User to apply profit to (optional)')),
   new SlashCommandBuilder().setName('rp').setDescription('Remove profit')
     .addNumberOption(opt => opt.setName('amount').setDescription('Amount to remove').setRequired(true))
-    .addUserOption(opt => opt.setName('user').setDescription('User to apply to (optional)')),
+    .addUserOption(opt => opt.setName('user').setDescription('User to remove profit from (optional)')),
   new SlashCommandBuilder().setName('vol').setDescription('Show volume earned')
     .addUserOption(opt => opt.setName('user').setDescription('User to check (optional)'))
     .addStringOption(opt => opt.setName('date').setDescription('Date (YYYY-MM-DD) to check (optional)')),
@@ -92,7 +92,10 @@ client.on('interactionCreate', async interaction => {
     historyData[today].total = Math.max(0, historyData[today].total + delta);
     fs.writeFileSync(historyFile, JSON.stringify(historyData));
 
-    await interaction.reply({ content: `${commandName === 'ap' ? 'Added' : 'Removed'} $${Math.abs(amount).toFixed(2)} ${commandName === 'ap' ? 'to' : 'from'} ${targetUser.username}'s profit.`, ephemeral: true });
+    await interaction.reply({
+      content: `${commandName === 'ap' ? 'Added' : 'Removed'} $${Math.abs(amount).toFixed(2)} ${commandName === 'ap' ? 'to' : 'from'} ${targetUser.username}'s profit.`,
+      ephemeral: true
+    });
   }
 
   if (commandName === 'vol') {
