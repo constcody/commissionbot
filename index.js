@@ -42,6 +42,12 @@ const commands = [
             option.setName('message')
                 .setDescription('The message to send.')
                 .setRequired(true)),
+    // New /nepal command definition
+    new SlashCommandBuilder().setName('nepal').setDescription('Sends your message to the channel.')
+        .addStringOption(option =>
+            option.setName('message')
+                .setDescription('The message to send.')
+                .setRequired(true)),
 ];
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
@@ -65,8 +71,8 @@ client.on('interactionCreate', async interaction => {
 
     const { commandName, user, member } = interaction;
 
-    // Admin role check - moved here to allow /talk to be used by anyone
-    if (commandName !== 'talk' && !member.roles.cache.has(ADMIN_ROLE_ID)) {
+    // Admin role check - moved here to allow /talk and /nepal to be used by anyone
+    if (commandName !== 'talk' && commandName !== 'nepal' && !member.roles.cache.has(ADMIN_ROLE_ID)) {
         await interaction.reply({ content: 'No permission.', ephemeral: true });
         return;
     }
@@ -180,6 +186,13 @@ client.on('interactionCreate', async interaction => {
         // It's good practice to reply to an interaction within 3 seconds,
         // even if it's an ephemeral message, before sending further messages.
         await interaction.reply({ content: 'Sending your message...', ephemeral: true });
+        await interaction.channel.send(message);
+    }
+
+    // New /nepal command handler
+    if (commandName === 'nepal') {
+        const message = interaction.options.getString('message');
+        await interaction.reply({ content: 'Sending your Nepal message...', ephemeral: true });
         await interaction.channel.send(message);
     }
 });
