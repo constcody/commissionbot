@@ -3,7 +3,7 @@ const { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes } = require
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
-const GUILD_ID = process.env.GUILD_ID;
+const GUILD_ID = process.env.GUILD_ID; // This will no longer be used for global commands
 const ADMIN_ROLE_ID = process.env.ADMIN_ROLE_ID;
 
 const commissionFile = 'commission.json';
@@ -17,7 +17,7 @@ if (!fs.existsSync(volumeFile)) fs.writeFileSync(volumeFile, JSON.stringify({ to
 if (!fs.existsSync(dailyUserFile)) fs.writeFileSync(dailyUserFile, JSON.stringify({ users: {} }));
 if (!fs.existsSync(historyFile)) fs.writeFileSync(historyFile, JSON.stringify({}));
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.MessageContent] }); // Add MessageContent intent
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.MessageContent] });
 
 const commands = [
     new SlashCommandBuilder().setName('ap').setDescription('Add profit')
@@ -36,13 +36,7 @@ const commands = [
         .addIntegerOption(opt => opt.setName('rate').setDescription('Rate percentage (10 or 15)').setRequired(true)
             .addChoices({ name: '10%', value: 10 }, { name: '15%', value: 15 })),
     new SlashCommandBuilder().setName('reset').setDescription('Reset your profit to 0'),
-    // New /talk command definition
-    new SlashCommandBuilder().setName('talk').setDescription('Sends your message to the channel.')
-        .addStringOption(option =>
-            option.setName('message')
-                .setDescription('The message to send.')
-                .setRequired(true)),
-    // New /nepal command definition
+    // Only /nepal command definition remains
     new SlashCommandBuilder().setName('nepal').setDescription('Sends your message to the channel.')
         .addStringOption(option =>
             option.setName('message')
@@ -54,9 +48,10 @@ const rest = new REST({ version: '10' }).setToken(TOKEN);
 
 (async () => {
     try {
-        console.log('Registering slash commands...');
-        await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
-        console.log('Commands registered.');
+        console.log('Registering slash commands globally...');
+        // Registers commands globally
+        await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
+        console.log('Global commands registered.');
     } catch (error) {
         console.error(error);
     }
@@ -71,8 +66,8 @@ client.on('interactionCreate', async interaction => {
 
     const { commandName, user, member } = interaction;
 
-    // Admin role check - moved here to allow /talk and /nepal to be used by anyone
-    if (commandName !== 'talk' && commandName !== 'nepal' && !member.roles.cache.has(ADMIN_ROLE_ID)) {
+    // Admin role check - now only allows /nepal for non-admins
+    if (commandName !== 'nepal' && !member.roles.cache.has(ADMIN_ROLE_ID)) {
         await interaction.reply({ content: 'No permission.', ephemeral: true });
         return;
     }
@@ -179,17 +174,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `Your profit has been reset to $0.`, ephemeral: true });
     }
 
-    // New /talk command handler
-    if (commandName === 'talk') {
-        const message = interaction.options.getString('message');
-        // Acknowledge the interaction first, then send the message to the channel.
-        // It's good practice to reply to an interaction within 3 seconds,
-        // even if it's an ephemeral message, before sending further messages.
-        await interaction.reply({ content: 'Sending your message...', ephemeral: true });
-        await interaction.channel.send(message);
-    }
-
-    // New /nepal command handler
+    // Only /nepal command handler remains
     if (commandName === 'nepal') {
         const message = interaction.options.getString('message');
         await interaction.reply({ content: 'Sending your Nepal message...', ephemeral: true });
