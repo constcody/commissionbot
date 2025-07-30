@@ -17,7 +17,7 @@ if (!fs.existsSync(volumeFile)) fs.writeFileSync(volumeFile, JSON.stringify({ to
 if (!fs.existsSync(dailyUserFile)) fs.writeFileSync(dailyUserFile, JSON.stringify({ users: {} }));
 if (!fs.existsSync(historyFile)) fs.writeFileSync(historyFile, JSON.stringify({}));
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.MessageContent] }); // Add MessageContent intent
 
 const commands = [
     new SlashCommandBuilder().setName('ap').setDescription('Add profit')
@@ -36,8 +36,8 @@ const commands = [
         .addIntegerOption(opt => opt.setName('rate').setDescription('Rate percentage (10 or 15)').setRequired(true)
             .addChoices({ name: '10%', value: 10 }, { name: '15%', value: 15 })),
     new SlashCommandBuilder().setName('reset').setDescription('Reset your profit to 0'),
-    // New /talk command
-    new SlashCommandBuilder().setName('talk').setDescription('Sends your message with "stinky nepali" appended.')
+    // New /talk command definition
+    new SlashCommandBuilder().setName('talk').setDescription('Sends your message to the channel.')
         .addStringOption(option =>
             option.setName('message')
                 .setDescription('The message to send.')
@@ -65,8 +65,7 @@ client.on('interactionCreate', async interaction => {
 
     const { commandName, user, member } = interaction;
 
-    // The /talk command should not require admin role, so move this check
-    // to apply only to the existing admin-only commands.
+    // Admin role check - moved here to allow /talk to be used by anyone
     if (commandName !== 'talk' && !member.roles.cache.has(ADMIN_ROLE_ID)) {
         await interaction.reply({ content: 'No permission.', ephemeral: true });
         return;
@@ -177,10 +176,11 @@ client.on('interactionCreate', async interaction => {
     // New /talk command handler
     if (commandName === 'talk') {
         const message = interaction.options.getString('message');
-        // You can reply ephemerally to confirm the command received,
-        // then send the actual message to the channel the interaction occurred in.
-        await interaction.reply({ content: `Sent your message!`, ephemeral: true });
-        await interaction.channel.send(`${message} stinky nepali`);
+        // Acknowledge the interaction first, then send the message to the channel.
+        // It's good practice to reply to an interaction within 3 seconds,
+        // even if it's an ephemeral message, before sending further messages.
+        await interaction.reply({ content: 'Sending your message...', ephemeral: true });
+        await interaction.channel.send(message);
     }
 });
 
